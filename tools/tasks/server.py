@@ -6,6 +6,14 @@ from fabric.contrib.files import exists, upload_template
 from tools.tasks.config import *
 
 
+
+SERVER_DEPS = [
+    "php-fpm",
+    "php-cli",
+    "nginx",
+    "git",
+]
+
 class Server(object):
 
     @staticmethod
@@ -21,16 +29,8 @@ class Server(object):
         """
         Install all server dependencies.
         """
-        distro = run("lsb_release -sc", shell=True)
-        deps_file = "./tools/scripts/system-%s.txt" % distro
-        pkgs = local("grep -vE '^\s*\#' %s  | tr '\n' ' '" % deps_file, capture=True)
-        sudo("apt-get install -y %s" % pkgs)
-        if SERVERS[env.stage]["db_engine"] == DB_MYSQL:
-            sudo('apt-get install -y mysql-server libmysqlclient-dev')
-        elif SERVERS[env.stage]["db_engine"] == DB_POSTGRESQL:
-            sudo('apt-get install -y postgresql postgresql-contrib libpq-dev')
-        else:
-            pass  # TODO configure ORACLE or SQLITE3
+        sudo('apt-get install -y %s' % ' '.join(SERVER_DEPS))
+
 
     @staticmethod
     def pip_cache():
@@ -58,6 +58,7 @@ class Server(object):
 
         sudo('mkdir -p %s' % get_user_home(env.stage))
 
+
     @staticmethod
     def group():
         """
@@ -80,60 +81,7 @@ class Server(object):
         else:
             pass  # TODO configure ORACLE or SQLITE3
 
-    @staticmethod
-    def mysql():
-        """
-        1. Verify id user exist.
-        2. If not user exist create DB user.
-        3. Verify if database exist.
-        4. If DB not exist create DB and assign to user.
-        """
 
-        # CREATE DATABASE
-        run("mysql -u %(mysql_user)s -p%(mysql_password)s -e 'CREATE DATABASE %(database)s;'" % {
-            "mysql_user": SERVERS[env.stage]["mysql_user"],
-            "mysql_password": SERVERS[env.stage]["mysql_pass"],
-            "database": make_app(env.project),
-        })
-
-        # CREATE USER
-        run("mysql -u %(mysql_user)s -p%(mysql_password)s -e "
-            "'CREATE USER \"%(user)s\"@\"localhost\" IDENTIFIED BY \"%(password)s\";'" % {
-                "mysql_user": SERVERS[env.stage]["mysql_user"],
-                "mysql_password": SERVERS[env.stage]["mysql_pass"],
-                "user": make_user(env.project),
-                "password": env.passwd,
-            })
-
-        # GRANT USER TO DB
-        run("mysql -u %(mysql_user)s -p%(mysql_password)s -e "
-            "'GRANT ALL PRIVILEGES ON %(database)s.* TO \"%(user)s\"@\"localhost\";'" % {
-                "mysql_user": SERVERS[env.stage]["mysql_user"],
-                "mysql_password": SERVERS[env.stage]["mysql_pass"],
-                "database": make_app(env.project),
-                "user": make_user(env.project),
-            })
-
-        run("mysql -u %(mysql_user)s -p%(mysql_password)s -e 'FLUSH PRIVILEGES;'" % {
-            "mysql_user": SERVERS[env.stage]["mysql_user"],
-            "mysql_password": SERVERS[env.stage]["mysql_pass"],
-        })
-
-    @staticmethod
-    def postgresql():
-        """
-        1. Create DB user.
-        2. Create DB and assign to user.
-        """
-        sudo('psql -c "CREATE USER %(db_user)s WITH NOCREATEDB NOCREATEUSER ENCRYPTED PASSWORD \'%(db_pass)s\'"' % {
-            "db_user": make_user(env.project),
-            "db_pass": env.passwd,
-        }, user='postgres')
-
-        sudo('psql -c "CREATE DATABASE %(db_name)s WITH OWNER %(db_user)s"' % {
-            "db_name": make_app(env.project),
-            "db_user": make_user(env.project),
-        }, user='postgres')
 
     @staticmethod
     def git():
@@ -141,11 +89,6 @@ class Server(object):
         1. Setup bare Git repo.
         2. Create post-receive hook.
         """
-        if exists(HOME_PATH) is False:
-            sudo('mkdir %s' % HOME_PATH)
-
-        if exists(get_user_home(env.stage)) is False:
-            sudo("mkdir %s" % get_user_home(env.stage))
 
         if exists(get_project_path(env.stage)) is False:
             sudo("mkdir %s" % get_project_path(env.stage))
@@ -154,7 +97,9 @@ class Server(object):
             sudo("mkdir %s/src" % get_project_path(env.stage))
 
         with cd(get_project_path(env.stage)):
-            sudo('mkdir -p %s.git' % env.project)
+            
+            sudo('mkdir -p %s.git' % env.project
+                )
             with cd('%s.git' % env.project):
                 sudo('git init --bare --shared')
                 with lcd("./tools/scripts"):
@@ -178,6 +123,7 @@ class Server(object):
                 "team": make_team(env.project),
                 "project": env.project,
             })
+
 
     @staticmethod
     def add_remote():
@@ -408,7 +354,7 @@ class Server(object):
         """
         sudo('pkill -u %s' % make_user(env.project))
 
-        Server.drop_db()
+        # Server.drop_db()
 
         if exists(get_project_path(env.stage)):
             sudo('rm -rf %s' % get_project_path(env.stage))
@@ -433,34 +379,4 @@ class Server(object):
         sudo('userdel -r %s' % make_user(env.project))
         sudo("rm -rf %s" % get_user_home(env.stage))
 
-    @staticmethod
-    def drop_db():
-        if SERVERS[env.stage]["db_engine"] == DB_MYSQL:
-            run("mysql -u %(mysql_user)s -p%(mysql_password)s -e 'DROP DATABASE %(database)s;'" % {
-                "mysql_user": SERVERS[env.stage]["mysql_user"],
-                "mysql_password": SERVERS[env.stage]["mysql_pass"],
-                "database": make_app(env.project),
-            })
-
-            run("mysql -u %(mysql_user)s -p%(mysql_password)s -e 'DROP USER \"%(user)s\"@\"localhost\";'" % {
-                "mysql_user": SERVERS[env.stage]["mysql_user"],
-                "mysql_password": SERVERS[env.stage]["mysql_pass"],
-                "user": make_user(env.project),
-            })
-
-            run("mysql -u %(mysql_user)s -p%(mysql_password)s -e 'FLUSH PRIVILEGES;'" % {
-                "mysql_user": SERVERS[env.stage]["mysql_user"],
-                "mysql_password": SERVERS[env.stage]["mysql_pass"],
-            })
-
-        elif SERVERS[env.stage]["db_engine"] == DB_POSTGRESQL:
-            sudo('psql -c "DROP DATABASE %s"' % make_app(env.project), user='postgres')
-            sudo('psql -c "DROP ROLE IF EXISTS %s"' % make_user(env.project), user='postgres')
-        else:
-            pass  # TODO configure ORACLE or SQLITE3
-
-    @staticmethod
-    def reset_db():
-        Server.drop_db()
-        Server.create_db()
 

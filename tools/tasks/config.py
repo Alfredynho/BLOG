@@ -11,12 +11,7 @@ from fabric.state import env
 # ---------------------------------------------------------------------
 
 SERVERS_FILE = "servers.json"
-DIGITALOCEAN_FILE = "digitalocean.json"
 HOME_PATH = "/webapps"
-
-DB_MYSQL = "mysql"
-DB_POSTGRESQL = "postgresql"
-DB_SQLITE = "sqlite"
 
 
 try:
@@ -33,16 +28,6 @@ def get_config(stage="develop"):
                 return server["settings"]
     raise Exception('Malformed servers.json configuration.')
 
-
-def get_digitalocean_config():
-    try:
-        import digitalocean
-        sfile = open(DIGITALOCEAN_FILE, 'r')
-        config = json.load(sfile)
-        manager = digitalocean.Manager(token=config["token"])
-        return config, manager
-    except Exception as e:
-        raise Exception('digitalocean.json file required!')
 
 
 def make_user(project):
@@ -65,17 +50,16 @@ def get_user_home(stage="develop"):
 
 
 def get_project_path(stage="develop"):
-    return "%(user_home)s/%(project)s" % {
-        "user_home": get_user_home(stage),
-        "project": make_app(SERVERS[stage]["project"]),
+    # import ipdb; ipdb.set_trace()
+    return "/var/www/%(domain)s" % {
+        "domain": SERVERS[stage]["domain"],
     }
-
 
 def get_project_src(stage="develop"):
-    return "%(user_home)s/%(project)s/src" % {
-        "user_home": get_user_home(stage),
-        "project": make_app(SERVERS[stage]["project"]),
+    return "/var/www/%(domain)s/src" % {
+        "domain": SERVERS[stage]["domain"],
     }
+
 
 
 def get_superuser():

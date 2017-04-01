@@ -46,19 +46,18 @@ def install():
 
     set_user(superuser=True)
     with settings(hide('warnings'), warn_only=True, ):
-        execute(Server.deps, hosts=env.hosts)
-        execute(Server.user, hosts=env.hosts)
-        execute(Server.group, hosts=env.hosts)
-        execute(Server.create_db, hosts=env.hosts)
+        # execute(Server.deps, hosts=env.hosts)
+        # execute(Server.user, hosts=env.hosts)
+        # execute(Server.group, hosts=env.hosts)
         execute(Server.git, hosts=env.hosts)
-        execute(Server.add_remote, hosts=env.hosts)
-        execute(Server.nginx, hosts=env.hosts)
-        execute(Server.gunicorn, hosts=env.hosts)
-        execute(Server.supervisor, hosts=env.hosts)
-        execute(Server.letsencrypt, hosts=env.hosts)
-        execute(Server.var, hosts=env.hosts)
-        execute(Server.pip_cache, hosts=env.hosts)
-        execute(Server.fix_permissions, hosts=env.hosts)
+        # execute(Server.add_remote, hosts=env.hosts)
+        # execute(Server.nginx, hosts=env.hosts)
+        # execute(Server.gunicorn, hosts=env.hosts)
+        # execute(Server.supervisor, hosts=env.hosts)
+        # execute(Server.letsencrypt, hosts=env.hosts)
+        # execute(Server.var, hosts=env.hosts)
+        # execute(Server.pip_cache, hosts=env.hosts)
+        # execute(Server.fix_permissions, hosts=env.hosts)
 
 
 @task
